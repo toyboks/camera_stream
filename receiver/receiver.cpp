@@ -13,6 +13,8 @@ using namespace std;
 
 int main() {
 
+    // udp socket setup
+
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
         cerr << "WSAStartup failed: " << endl;
@@ -38,7 +40,8 @@ int main() {
         return -1;
     }
 
-    int measurement_period = 3000; // in millisecond
+    // variables for measurement of video stream fps rate, described below
+    const int measurement_period = 3000; // in millisecond
     int frames_counter = 0;
     auto time_start = high_resolution_clock::now();
     while (true) {
@@ -46,13 +49,14 @@ int main() {
         const int buffer_size = 100000;
         char buffer[buffer_size];
 
+        // udp packet is received and bytes are placed in buffer
         int bytesReceived = recvfrom(sock, buffer, buffer_size, 0, nullptr, nullptr);
-
         if (bytesReceived == SOCKET_ERROR) {
             cerr << "Error in recvfrom." << endl;
             continue;
         }
 
+        // each video frame is displayed as separate .jpg in opencv window
         if (bytesReceived > 0) {
             vector<uchar> imageBuffer(buffer, buffer + bytesReceived);
             Mat img = imdecode(imageBuffer, IMREAD_COLOR);
@@ -63,6 +67,8 @@ int main() {
                 cerr << "Error decoding image." << endl;
         }
 
+        // frames are counted in about measurement_period periods
+        // in each period fps rate is refreshed in terminal
         frames_counter ++;
         auto time_stop = high_resolution_clock::now();
         auto duration = duration_cast<milliseconds>(time_stop - time_start);
@@ -75,6 +81,7 @@ int main() {
         }
     }
 
+    // cleanup
     closesocket(sock);
     WSACleanup();
 
