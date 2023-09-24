@@ -2,6 +2,8 @@
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
 
+#include "opencv2/opencv.hpp"
+
 int main() {
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -31,10 +33,11 @@ int main() {
         return -1;
     }
 
-    char buffer;
+    char buffer[32000];
 
     while (true) {
-        int bytesReceived = recvfrom(sock, &buffer, sizeof(buffer), 0, nullptr, nullptr);
+        int bytesReceived = recvfrom(sock, buffer, sizeof(buffer), 0, nullptr, nullptr);
+        std::cout << "received" << std::endl;
 
         if (bytesReceived == SOCKET_ERROR) {
             std::cerr << "Error in recvfrom." << std::endl;
@@ -42,9 +45,21 @@ int main() {
         }
 
         if (bytesReceived > 0) {
+            std::vector<uchar> imageBuffer(buffer, buffer + bytesReceived);
+            cv::Mat img = cv::imdecode(imageBuffer, cv::IMREAD_COLOR);
+            if (!img.empty()) {
+                cv::imshow("Received Image", img);
+                cv::waitKey(1); // Adjust the delay as needed
+            } else {
+                std::cout << "Error decoding image." << std::endl;
+            }
             // Print the received data to the terminal
-            std::cout << buffer;
+            std::cout.write(buffer, bytesReceived);
+            std::cout << std::endl;
+            //Sleep(3000); // Send 'a' every 1 second
         }
+
+        
     }
 
     closesocket(sock);

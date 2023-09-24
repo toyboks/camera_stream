@@ -1,54 +1,21 @@
-/*#include "main.h"
-
-using namespace std;
-using namespace cv;
-
-int main( int argc, char ** argv )
-{
-
-	namedWindow( "test", WINDOW_NORMAL);
-
-    	VideoCapture cap;
-
-	if ( argc == 1 ){
-
-		cap.open(0);   // To open the first camera
-	}
-	else
-	{
-		cap.open( argv[1] );
-	}
-
- 	if ( ! cap.isOpened( ) ) {
-		cerr << "couldn't open capture."<<endl;
-		return -1;
-	}
-
-	Mat frame;
-
-	while( 1 ) {
-
-		cap>>frame;
-
-		if( frame.empty( ) ) 
-			break;
-
-		imshow ( "test", frame );
-
-		if ( waitKey ( 30 ) >= 0 )
-			break;
-
-	}
-
-	return 0;
-
-}*/
-
 #include <iostream>
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
 
+#include "opencv2/opencv.hpp"
+
 int main() {
+
+    cv::VideoCapture cap(0);
+
+    if (!cap.isOpened()) {
+        std::cerr << "Error: Could not open camera." << std::endl;
+        return -1;
+    }
+
+    cv::Mat frame;
+
+
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -73,12 +40,35 @@ int main() {
     char message = 'b';
 
     while (true) {
-        sendto(sock, &message, sizeof(message), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        cap.read(frame);
+        if (frame.empty()) {
+            break;
+        }
+
+        int down_width = 100;
+        int down_height = 100;
+        resize(frame, frame, cv::Size(down_width, down_height), cv::INTER_LINEAR);
+
+        std::vector<uchar> buffer;
+        cv::imencode(".jpg", frame, buffer);
+        if (!frame.empty()) {
+            cv::imshow("Received Image", frame);
+            cv::waitKey(1); // Adjust the delay as needed
+        } else {
+            std::cout << "Error decoding image." << std::endl;
+        }
+        
+        //message = buffer[0];
+        //sendto(sock, &message, sizeof(message), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        sendto(sock, (const char*)buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        std::cout << buffer.size() << std::endl;
+
         Sleep(1000); // Send 'a' every 1 second
     }
 
     closesocket(sock);
     WSACleanup();
+    cap.release();
 
     return 0;
 }
