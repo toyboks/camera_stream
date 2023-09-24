@@ -9,23 +9,30 @@ using namespace std;
 using namespace cv;
 
 
-Size find_size(const int max_len, Mat sample_frame);
+// finds best dimensions to downsize image keeping aspect ratio
+Size find_size(const int max_len, Mat sample_img) {
+    int cols = sample_img.cols;
+    int rows = sample_img.rows;
+    
+    while(cols * rows > max_len) {
+        (int)rows = cols * (cols-1) / rows;
+        cols --;
+    }
+    return Size(cols, rows);
+}
 
 
 int main() {
 
     WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-    if (result != 0) {
-        cerr << "WSAStartup failed: " << result << endl;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
+        cerr << "WSAStartup failed: " << endl;
         return -1;
     }
 
     SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
-
     if (sock == INVALID_SOCKET) {
-        cerr << "Error: Could not create socket." << endl;
+        cerr << "Failed to create socket." << endl;
         WSACleanup();
         return -1;
     }
@@ -36,36 +43,35 @@ int main() {
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(receiver_port);
     serverAddr.sin_addr.s_addr = inet_addr(receiver_addr);
-
+    
     VideoCapture cap(0);
     if (!cap.isOpened()) {
         cerr << "Error: Could not open camera." << endl;
         return -1;
     }
 
-    Mat sample_frame;
-    cap.read(sample_frame);
-    const int max_bytes = 10000;
-    Size frame_size = find_size(max_bytes, sample_frame);
+    Mat sample_img;
+    cap.read(sample_img);
+    const int max_bytes = 100000;
+    Size img_size = find_size(max_bytes, sample_img);
     
-
     while (true) {
-        Mat frame;
-        cap.read(frame);
-        if (frame.empty()) {
-            cerr << "Error getting frame" << endl;
+        Mat img;
+        cap.read(img);
+        if (img.empty()) {
+            cerr << "Error getting img" << endl;
             continue;
         }
 
-        resize(frame, frame, frame_size, INTER_LINEAR);
+        resize(img, img, img_size, INTER_LINEAR);
 
         vector<uchar> buffer;
-        imencode(".jpg", frame, buffer);
+        imencode(".jpg", img, buffer);
 
-        imshow("Camera preview", frame);
-        waitKey(1); // Adjust the delay as needed
+        imshow("Camera preview", img);
+        waitKey(5);
         
-        sendto(sock, (const char*)buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        sendto(sock, (const char*)buffer.data(), (int)buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
     }
 
     closesocket(sock);
@@ -73,17 +79,4 @@ int main() {
     cap.release();
 
     return 0;
-}
-
-
-// finds best dimensions to downsize image keeping aspect ratio
-Size find_size(const int max_len, Mat sample_frame) {
-    int cols = sample_frame.cols;
-    int rows = sample_frame.rows;
-    
-    while(cols * rows > max_len) {
-        (int)rows = cols * (cols-1) / rows;
-        cols --;
-    }
-    return Size(cols, rows);
 }
