@@ -38,11 +38,9 @@ int main() {
         return -1;
     }
 
-    const int frames_to_count = 10;
+    int measurement_period = 3000; // in millisecond
     int frames_counter = 0;
     auto time_start = high_resolution_clock::now();
-    auto time_stop = high_resolution_clock::now();
-
     while (true) {
 
         const int buffer_size = 100000;
@@ -65,16 +63,16 @@ int main() {
                 cerr << "Error decoding image." << endl;
         }
 
-        if (frames_counter == frames_to_count - 1){
-            time_stop = high_resolution_clock::now();
-            auto duration = duration_cast<milliseconds>(time_stop - time_start);
+        frames_counter ++;
+        auto time_stop = high_resolution_clock::now();
+        auto duration = duration_cast<milliseconds>(time_stop - time_start);
+        if (duration.count() >= measurement_period) {
             time_start = high_resolution_clock::now();
-            long long fps_rate = (1000 * frames_to_count)  / duration.count();
+            long long fps_rate = (1000 * frames_counter)  / duration.count();
             system("cls");
             cout << "FPS rate: " << fps_rate << endl;
             frames_counter = 0;
         }
-        frames_counter ++;
     }
 
     closesocket(sock);
