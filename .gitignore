@@ -2,6 +2,7 @@
 *Release
 *CMakeFiles
 
+*.vscode*
 *.vcxproj*
 *.sln
 *.o
