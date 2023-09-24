@@ -4,66 +4,68 @@
 
 #include "opencv2/opencv.hpp"
 
+
+using namespace std;
+using namespace cv;
+
+
+Size find_size(const int max_len, Mat sample_frame);
+
+
 int main() {
-
-    cv::VideoCapture cap(0);
-
-    if (!cap.isOpened()) {
-        std::cerr << "Error: Could not open camera." << std::endl;
-        return -1;
-    }
-
-    cv::Mat frame;
-
 
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
     if (result != 0) {
-        std::cerr << "WSAStartup failed: " << result << std::endl;
+        cerr << "WSAStartup failed: " << result << endl;
         return -1;
     }
 
     SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     if (sock == INVALID_SOCKET) {
-        std::cerr << "Error: Could not create socket." << std::endl;
+        cerr << "Error: Could not create socket." << endl;
         WSACleanup();
         return -1;
     }
 
+    const char receiver_addr[] = "127.0.0.1";
+    const int receiver_port = 12345;
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(12345); // Replace with the desired destination port
-    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Replace with the destination IP address
+    serverAddr.sin_port = htons(receiver_port);
+    serverAddr.sin_addr.s_addr = inet_addr(receiver_addr);
 
-    char message = 'b';
+    VideoCapture cap(0);
+    if (!cap.isOpened()) {
+        cerr << "Error: Could not open camera." << endl;
+        return -1;
+    }
+
+    Mat sample_frame;
+    cap.read(sample_frame);
+    const int max_bytes = 10000;
+    Size frame_size = find_size(max_bytes, sample_frame);
+    
 
     while (true) {
+        Mat frame;
         cap.read(frame);
         if (frame.empty()) {
-            break;
+            cerr << "Error getting frame" << endl;
+            continue;
         }
 
-        int down_width = 100;
-        int down_height = 100;
-        resize(frame, frame, cv::Size(down_width, down_height), cv::INTER_LINEAR);
+        resize(frame, frame, frame_size, INTER_LINEAR);
 
-        std::vector<uchar> buffer;
-        cv::imencode(".jpg", frame, buffer);
-        if (!frame.empty()) {
-            cv::imshow("Received Image", frame);
-            cv::waitKey(1); // Adjust the delay as needed
-        } else {
-            std::cout << "Error decoding image." << std::endl;
-        }
+        vector<uchar> buffer;
+        imencode(".jpg", frame, buffer);
+
+        imshow("Camera preview", frame);
+        waitKey(1); // Adjust the delay as needed
         
-        //message = buffer[0];
-        //sendto(sock, &message, sizeof(message), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
         sendto(sock, (const char*)buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
-        std::cout << buffer.size() << std::endl;
-
-        Sleep(1000); // Send 'a' every 1 second
     }
 
     closesocket(sock);
@@ -71,4 +73,17 @@ int main() {
     cap.release();
 
     return 0;
+}
+
+
+// finds best dimensions to downsize image keeping aspect ratio
+Size find_size(const int max_len, Mat sample_frame) {
+    int cols = sample_frame.cols;
+    int rows = sample_frame.rows;
+    
+    while(cols * rows > max_len) {
+        (int)rows = cols * (cols-1) / rows;
+        cols --;
+    }
+    return Size(cols, rows);
 }
